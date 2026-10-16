@@ -47,6 +47,7 @@ sequenceDiagram
 
 ## ✨ Características Principales
 
+* 🔄 **Auto-Rotación y Persistencia de Cookies:** Intercepta en caliente los encabezados `Set-Cookie` devueltos por Google y actualiza automáticamente `__Secure-1PSIDTS` en memoria y en tu archivo `.env`, prolongando la vida de la sesión sin intervención manual.
 * 🛡️ **Saneador de Esquemas OpenAPI:** Resuelve recursivamente referencias `$defs` y `$ref`, limpia `additionalProperties`, fusiona `allOf` y normaliza tipos unión para garantizar compatibilidad del 100%.
 * ⚡ **Interceptor Nativo de Auto-Review:** Aprueba automáticamente solicitudes `REVIEW_POLICY` de DeepSeek Harness (`@deepseek-ai/dsh-experimental-auto-review`) con el formato JSON estricto requerido (`{"risk":"low","decision":"allow"}`), eliminando bloqueos de permisos.
 * 💬 **Persistencia de Hilo Continuo:** Reutiliza `conversationId` y `responseId` de Google Web para trabajar siempre dentro del mismo chat, manteniendo el historial limpio en tu cuenta.

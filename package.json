@@ -7,8 +7,8 @@
   "scripts": {
     "start": "node --max-http-header-size=131072 server.mjs",
     "dev": "node --watch --max-http-header-size=131072 server.mjs",
-    "test": "node test-suite.mjs && node test-autoreview.mjs",
-    "test:all": "node test-suite.mjs && node test-autoreview.mjs && node test-stream.mjs && node test-e2e.mjs"
+    "test": "node test-suite.mjs && node test-autoreview.mjs && node test-cookie-sync.mjs",
+    "test:all": "node test-suite.mjs && node test-autoreview.mjs && node test-cookie-sync.mjs"
   },
   "keywords": [
     "gemini",

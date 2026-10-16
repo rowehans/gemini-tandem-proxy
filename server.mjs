@@ -24,18 +24,27 @@ if (fs.existsSync(envPath)) {
   }
 }
 
-// --- CONFIGURACIÓN DE CREDENCIALES ---
+// --- CONFIGURACIÓN DE CREDENCIALES DINÁMICAS ---
 // 1. Cerebro: Gemini 4 Argon (Web - Google AI Pro)
-const PSID = process.env.GEMINI_PSID || '';
-const PSIDTS = process.env.GEMINI_PSIDTS || '';
-const COOKIE_HEADER = `__Secure-1PSID=${PSID}; __Secure-1PSIDTS=${PSIDTS};`;
+let currentPSID = process.env.GEMINI_PSID || '';
+let currentPSIDTS = process.env.GEMINI_PSIDTS || '';
+let currentPSIDCC = '';
+let currentBl = 'boq_gemini-web-uiserver_20261016.00_p0';
+
+function getCookieHeader() {
+  const parts = [];
+  if (currentPSID) parts.push(`__Secure-1PSID=${currentPSID}`);
+  if (currentPSIDTS) parts.push(`__Secure-1PSIDTS=${currentPSIDTS}`);
+  if (currentPSIDCC) parts.push(`__Secure-1PSIDCC=${currentPSIDCC}`);
+  return parts.join('; ') + (parts.length > 0 ? ';' : '');
+}
 
 // 2. Manos: Gemini Flash (API oficial para llamadas de herramientas nativas)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-if (!PSID || !PSIDTS) {
+if (!currentPSID || !currentPSIDTS) {
   console.warn('[AVISO CONFIG]: GEMINI_PSID o GEMINI_PSIDTS no están presentes en .env. Argon Web operará mediante contingencia API.');
 }
 if (!GEMINI_API_KEY) {
@@ -48,6 +57,76 @@ let currentConversationId = '';
 let currentResponseId = '';
 let currentChoiceId = '';
 
+function syncCookiesToEnv(newPsid, newPsidts) {
+  try {
+    if (!fs.existsSync(envPath)) return;
+    let content = fs.readFileSync(envPath, 'utf8');
+    let modified = false;
+
+    if (newPsid && newPsid !== process.env.GEMINI_PSID) {
+      if (/GEMINI_PSID=.*/.test(content)) {
+        content = content.replace(/GEMINI_PSID=.*/, `GEMINI_PSID="${newPsid}"`);
+      } else {
+        content += `\nGEMINI_PSID="${newPsid}"`;
+      }
+      process.env.GEMINI_PSID = newPsid;
+      currentPSID = newPsid;
+      modified = true;
+    }
+
+    if (newPsidts && newPsidts !== process.env.GEMINI_PSIDTS) {
+      if (/GEMINI_PSIDTS=.*/.test(content)) {
+        content = content.replace(/GEMINI_PSIDTS=.*/, `GEMINI_PSIDTS="${newPsidts}"`);
+      } else {
+        content += `\nGEMINI_PSIDTS="${newPsidts}"`;
+      }
+      process.env.GEMINI_PSIDTS = newPsidts;
+      currentPSIDTS = newPsidts;
+      modified = true;
+    }
+
+    if (modified) {
+      fs.writeFileSync(envPath, content, 'utf8');
+      console.log('[COOKIE AUTO-SYNC]: ✅ Google rotó la sesión. Nueva cookie guardada automáticamente en .env');
+    }
+  } catch (err) {
+    console.error(`[COOKIE AUTO-SYNC ERROR]: Error guardando cookies en .env: ${err.message}`);
+  }
+}
+
+function processSetCookieHeaders(headers) {
+  const setCookies = headers['set-cookie'];
+  if (!setCookies) return;
+
+  const cookieList = Array.isArray(setCookies) ? setCookies : [setCookies];
+  let updatedPsid = null;
+  let updatedPsidts = null;
+
+  for (const c of cookieList) {
+    const firstPart = c.split(';')[0];
+    const eqIdx = firstPart.indexOf('=');
+    if (eqIdx === -1) continue;
+    const name = firstPart.slice(0, eqIdx).trim();
+    const val = firstPart.slice(eqIdx + 1).trim();
+
+    if (name === '__Secure-1PSIDTS' || name === '__Secure-3PSIDTS') {
+      if (val && val !== currentPSIDTS) {
+        updatedPsidts = val;
+      }
+    } else if (name === '__Secure-1PSID' || name === '__Secure-3PSID') {
+      if (val && val !== currentPSID) {
+        updatedPsid = val;
+      }
+    } else if (name === '__Secure-1PSIDCC' || name === '__Secure-3PSIDCC') {
+      currentPSIDCC = val;
+    }
+  }
+
+  if (updatedPsid || updatedPsidts) {
+    syncCookiesToEnv(updatedPsid, updatedPsidts);
+  }
+}
+
 function httpsRequest(options, postData = null, timeoutMs = 90000) {
   return new Promise((resolve, reject) => {
     const opts = {
@@ -59,6 +138,9 @@ function httpsRequest(options, postData = null, timeoutMs = 90000) {
       const chunks = [];
       res.on('data', chunk => chunks.push(chunk));
       res.on('end', () => {
+        if (res.headers) {
+          processSetCookieHeaders(res.headers);
+        }
         resolve({
           statusCode: res.statusCode,
           headers: res.headers,
@@ -91,9 +173,29 @@ async function getAtToken(forceRefresh = false) {
     method: 'GET',
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
-      'Cookie': COOKIE_HEADER
+      'Cookie': getCookieHeader(),
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+      'Accept-Language': 'es-419,es;q=0.9,en;q=0.8',
+      'sec-ch-ua': '"Google Chrome";v="129", "Not=A?Brand";v="8", "Chromium";v="129"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-ch-ua-platform': '"Windows"',
+      'sec-fetch-dest': 'document',
+      'sec-fetch-mode': 'navigate',
+      'sec-fetch-site': 'none',
+      'sec-fetch-user': '?1',
+      'upgrade-insecure-requests': '1'
     }
   });
+
+  if (res.statusCode === 302 || res.statusCode === 301) {
+    const loc = res.headers.location || '';
+    if (loc.includes('/sorry/index')) {
+      throw new Error('Google activó desafío anti-bot (CAPTCHA). Abre gemini.google.com en Chrome para renovar la sesión.');
+    }
+  }
+
+  const blMatch = res.body.match(/"cfb2h":"([^"]+)"/);
+  if (blMatch) currentBl = blMatch[1];
 
   const match = res.body.match(/"SNlM0e":"([^"]+)"/);
   if (!match) throw new Error('No se pudo extraer el token SNlM0e de sesión de Gemini.');
@@ -132,15 +234,34 @@ ${promptText}`;
 
       const res = await httpsRequest({
         hostname: 'gemini.google.com',
-        path: `/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate?bl=boq_assistant-bard-web-server_20261014.07_p0&_reqid=${reqId}&rt=c`,
+        path: `/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate?bl=${currentBl}&_reqid=${reqId}&rt=c`,
         method: 'POST',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
-          'Cookie': COOKIE_HEADER,
+          'Cookie': getCookieHeader(),
           'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-          'Content-Length': Buffer.byteLength(postBody)
+          'Content-Length': Buffer.byteLength(postBody),
+          'Origin': 'https://gemini.google.com',
+          'Referer': 'https://gemini.google.com/',
+          'Accept': '*/*',
+          'Accept-Language': 'es-419,es;q=0.9,en;q=0.8',
+          'sec-ch-ua': '"Google Chrome";v="129", "Not=A?Brand";v="8", "Chromium";v="129"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"',
+          'sec-fetch-dest': 'empty',
+          'sec-fetch-mode': 'cors',
+          'sec-fetch-site': 'same-origin',
+          'X-Same-Domain': '1'
         }
       }, postBody);
+
+      if (res.statusCode === 302 || res.statusCode === 301) {
+        const loc = res.headers.location || '';
+        if (loc.includes('/sorry/index')) {
+          throw new Error('Google activó desafío anti-bot (CAPTCHA). Abre gemini.google.com en Chrome para renovar la sesión.');
+        }
+        throw new Error(`Google redirigió a ${loc}`);
+      }
 
       if (res.statusCode !== 200) throw new Error(`Google respondió con código HTTP ${res.statusCode}`);
 
@@ -182,6 +303,9 @@ ${promptText}`;
     } catch (err) {
       console.warn(`[CEREBRO WARN]: Intento ${attempt}/${retries} falló: ${err.message}`);
       cachedAt = null;
+      currentConversationId = '';
+      currentResponseId = '';
+      currentChoiceId = '';
       if (attempt < retries) {
         await new Promise(r => setTimeout(r, 1000));
       }
