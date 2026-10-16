@@ -131,6 +131,8 @@ En tu archivo de perfil (`cordis.patch.yml`):
         models:
           - id: gemini-4-argon
             name: gemini-4-argon
+            contextWindow: 2000000
+            maxTokens: 65536
 ```
 > **Consejo:** En el menú de permisos de DeepSeek Harness, selecciona **Acceso total** para máxima autonomía.
 
