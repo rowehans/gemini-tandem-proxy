@@ -1,0 +1,30 @@
+{
+  "name": "gemini-tandem-proxy",
+  "version": "1.0.0",
+  "description": "Proxy OpenAI local que conecta Gemini 4 Argon (Google AI Pro Web) como Cerebro Estratégico y Gemini Flash como Manos Ejecutivas con soporte para DeepSeek Harness, Cursor, Cline y más.",
+  "main": "server.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node --max-http-header-size=131072 server.mjs",
+    "dev": "node --watch --max-http-header-size=131072 server.mjs",
+    "test": "node test-suite.mjs && node test-autoreview.mjs",
+    "test:all": "node test-suite.mjs && node test-autoreview.mjs && node test-stream.mjs && node test-e2e.mjs"
+  },
+  "keywords": [
+    "gemini",
+    "gemini-argon",
+    "google-ai-pro",
+    "openai-proxy",
+    "deepseek-harness",
+    "cursor",
+    "cline",
+    "tool-calling",
+    "function-calling",
+    "ai-agent"
+  ],
+  "author": "Hans Rowe",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.6.0"
+  }
+}
